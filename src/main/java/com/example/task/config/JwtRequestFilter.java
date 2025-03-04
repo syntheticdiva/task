@@ -39,69 +39,48 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 public class JwtRequestFilter extends OncePerRequestFilter {
+
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
 
-    private static final String[] PUBLIC_PATHS = {
-            "/api/auth/**",
-            "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/webjars/**",
-            "/swagger-resources/**"
-    };
-
-    private final AntPathMatcher pathMatcher = new AntPathMatcher();
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain chain) throws ServletException, IOException {
-
-        String requestUri = request.getRequestURI();
-
-        for (String publicPath : PUBLIC_PATHS) {
-            if (pathMatcher.match(publicPath, requestUri)) {
-                chain.doFilter(request, response);
-                return;
-            }
-        }
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
         String username = null;
         String jwt = null;
 
-        try {
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                jwt = authHeader.substring(7);
-                username = jwtUtil.extractUsername(jwt); // Изменения могут быть здесь
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            jwt = authHeader.substring(7);
+            try {
+                username = jwtUtil.extractUsername(jwt);
+            } catch (ExpiredJwtException ex) {
+                logger.warn("JWT token expired: " + ex.getMessage());
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT expired");
+                return;
+            } catch (SignatureException ex) {
+                logger.warn("Invalid JWT signature: " + ex.getMessage());
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid signature");
+                return;
+            } catch (Exception ex) {
+                logger.warn("Invalid JWT token: " + ex.getMessage());
+                response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid token");
+                return;
             }
+        }
 
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                if (jwtUtil.validateToken(jwt, userDetails)) { // И здесь
-                    var authentication = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-                    authentication.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request)
-                    );
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+            if (jwtUtil.validateToken(jwt, userDetails)) {
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
-        } catch (ExpiredJwtException ex) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT expired");
-            return;
-        } catch (SignatureException ex) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid signature");
-            return;
-        } catch (Exception ex) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid token");
-            return;
         }
 
         chain.doFilter(request, response);
     }
-
 }

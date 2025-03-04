@@ -11,7 +11,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
-
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -19,7 +18,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public User registerUser(String email, String password) {
+    public User registerUser(String email, String password, Set<Role> roles) {
         if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email already exists");
         }
@@ -27,14 +26,16 @@ public class UserService {
         User user = new User();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
-        user.setRoles(Set.of(Role.ROLE_USER));
+        user.setRoles(roles);
 
         return userRepository.save(user);
     }
 
     public User createAdmin(String email, String password) {
-        User user = registerUser(email, password);
-        user.getRoles().add(Role.ROLE_ADMIN);
-        return userRepository.save(user);
+        return registerUser(email, password, Set.of(Role.ROLE_ADMIN));
+    }
+
+    public User createUser(String email, String password) {
+        return registerUser(email, password, Set.of(Role.ROLE_USER));
     }
 }

@@ -35,6 +35,7 @@ public class TaskController {
     }
 
     @Operation(summary = "Получить задачи по исполнителю", description = "Возвращает список задач по ID исполнителя")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     @GetMapping("/assignee/{assigneeId}")
     public ResponseEntity<List<Task>> getTasksByAssignee(
             @Parameter(description = "ID исполнителя задачи") @PathVariable Long assigneeId) {

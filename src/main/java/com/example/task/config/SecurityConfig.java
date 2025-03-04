@@ -17,7 +17,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -36,20 +35,14 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/swagger-ui.html",
+                                "/api/auth/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/webjars/**",
-                                "/swagger-resources/**",
-                                "/swagger-ui/index.html",
-                                "/swagger-ui/swagger-initializer.js",
-                                "/swagger-ui/swagger-ui.css",
-                                "/swagger-ui/swagger-ui-bundle.js",
-                                "/swagger-ui/swagger-ui-standalone-preset.js",
-                                "/swagger-ui/favicon-32x32.png",
-                                "/swagger-ui/favicon-16x16.png"
+                                "/swagger-resources/**"
                         ).permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/**").hasRole("ADMIN") // Только для администраторов
+                        .requestMatchers("/api/tasks/**").hasAnyRole("ADMIN", "USER") // Для администраторов и пользователей
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
@@ -58,13 +51,9 @@ public class SecurityConfig {
 
         return http.build();
     }
+
     @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration authenticationConfiguration) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
-    }
-    @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.addAllowedOrigin("*");
         configuration.addAllowedMethod("*");
@@ -79,19 +68,9 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
 }
-
-
-
-
-//   РАБОЧИЙ БЕЗ АВТОРИЗ
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-//        http
-//                .csrf(csrf -> csrf.disable())
-//                .authorizeHttpRequests(auth -> auth
-//                        .anyRequest().permitAll()  // Разрешаем все запросы без аутентификации
-//                );
-//
-//        return http.build();
-//    }

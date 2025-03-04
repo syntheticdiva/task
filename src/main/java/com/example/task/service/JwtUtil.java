@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.function.Function;
 
@@ -19,9 +20,11 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secretString;
 
-
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretString);
+        byte[] keyBytes = secretString.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException("JWT secret key must be at least 256 bits (32 characters)");
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -29,7 +32,7 @@ public class JwtUtil {
         return Jwts.builder()
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
+                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // 10 часов
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -41,6 +44,7 @@ public class JwtUtil {
                 .parseSignedClaims(token)
                 .getPayload();
     }
+
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
