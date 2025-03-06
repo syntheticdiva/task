@@ -41,8 +41,8 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/swagger-resources/**"
                         ).permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN") // Только для администраторов
-                        .requestMatchers("/api/tasks/**").hasAnyRole("ADMIN", "USER") // Для администраторов и пользователей
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/tasks/**").hasAnyRole("ADMIN", "USER")
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->

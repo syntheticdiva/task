@@ -6,8 +6,8 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Data
-@NoArgsConstructor
 public class Comment {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -15,8 +15,10 @@ public class Comment {
     private String text;
 
     @ManyToOne
+    @JoinColumn(name = "task_id")
     private Task task;
 
     @ManyToOne
+    @JoinColumn(name = "author_id")
     private User author;
 }

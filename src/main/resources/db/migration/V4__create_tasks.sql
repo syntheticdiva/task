@@ -1,6 +1,3 @@
-CREATE TYPE task_status_type AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED');
-CREATE TYPE task_priority_type AS ENUM ('HIGH', 'MEDIUM', 'LOW');
-
 CREATE TABLE tasks (
     id BIGSERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,

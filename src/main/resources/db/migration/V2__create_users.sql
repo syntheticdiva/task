@@ -1,4 +1,3 @@
--- Новая структура таблицы users
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,

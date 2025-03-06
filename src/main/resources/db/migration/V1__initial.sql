@@ -1,3 +1,3 @@
--- Создаем новый ENUM с префиксом ROLE_
 CREATE TYPE role_type AS ENUM ('ROLE_USER', 'ROLE_ADMIN');
-
+CREATE TYPE task_status_type AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED');
+CREATE TYPE task_priority_type AS ENUM ('HIGH', 'MEDIUM', 'LOW');
