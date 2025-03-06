@@ -11,9 +11,12 @@
     import com.example.task.service.TaskService;
     import io.swagger.v3.oas.annotations.Operation;
     import io.swagger.v3.oas.annotations.Parameter;
+    import io.swagger.v3.oas.annotations.enums.ParameterIn;
+    import io.swagger.v3.oas.annotations.responses.ApiResponse;
     import io.swagger.v3.oas.annotations.security.SecurityRequirement;
     import io.swagger.v3.oas.annotations.tags.Tag;
     import lombok.RequiredArgsConstructor;
+    import org.apache.coyote.BadRequestException;
     import org.springframework.beans.factory.annotation.Autowired;
     import org.springframework.data.domain.Page;
     import org.springframework.http.HttpStatus;
@@ -26,7 +29,7 @@
 
     @RestController
     @RequestMapping("/api/tasks")
-    @Tag(name = "Task Management", description = "API для управления задачами")
+    @Tag(name = "Task Management")
     @SecurityRequirement(name = "Bearer Authentication")
     public class TaskController {
 
@@ -56,7 +59,6 @@
         }
 
         @Operation(summary = "Создать новую задачу")
-    //    @RequestMapping("/create")
         @PreAuthorize("hasRole('ADMIN')")
         @PostMapping("/create")
         public ResponseEntity<Task> createTask(@RequestBody CreateTaskRequest request, Authentication authentication) {
@@ -102,8 +104,20 @@
                 Comment comment = taskService.addComment(taskId, request.getText(), author);
                 return ResponseEntity.status(HttpStatus.CREATED).body(comment);
             }
-        @PatchMapping("/{taskId}/status")
-        @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+        @Operation(
+                summary = "Update task status",
+                description = "Обновление статуса задачи. Доступно администраторам и исполнителю задачи",
+                security = @SecurityRequirement(name = "Bearer Authentication", scopes = {"ADMIN", "USER"}),
+                parameters = {
+                        @Parameter(
+                                name = "taskId",
+                                in = ParameterIn.PATH,
+                                description = "ID обновляемой задачи",
+                                example = "1",
+                                required = true
+                        )
+                }
+        )
         public ResponseEntity<Task> updateTaskStatus(
                 @PathVariable Long taskId,
                 @RequestBody UpdateTaskStatusRequest request,
@@ -129,6 +143,22 @@
             return ResponseEntity.ok(task);
         }
         @GetMapping
+        @Operation(
+                summary = "Get tasks",
+                description = "Returns filtered and paginated tasks. Requires at least one filter parameter",
+                parameters = {
+                        @Parameter(name = "status", description = "Task status filter"),
+                        @Parameter(name = "priority", description = "Task priority filter"),
+                        @Parameter(name = "authorId", description = "Author ID filter"),
+                        @Parameter(name = "assigneeId", description = "Assignee ID filter"),
+                        @Parameter(name = "page", description = "Page number (0-based)", example = "0"),
+                        @Parameter(name = "size", description = "Page size (1-100)", example = "20")
+                },
+                responses = {
+                        @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+                        @ApiResponse(responseCode = "200", description = "Successfully retrieved tasks")
+                }
+        )
         public ResponseEntity<Page<Task>> getTasks(
                 @RequestParam(required = false) TaskStatus status,
                 @RequestParam(required = false) TaskPriority priority,
@@ -136,7 +166,7 @@
                 @RequestParam(required = false) Long assigneeId,
                 @RequestParam(defaultValue = "0") int page,
                 @RequestParam(defaultValue = "10") int size
-        ) {
+        ) throws BadRequestException {
             Page<Task> tasks = taskService.getTasks(status, priority, authorId, assigneeId, page, size);
             return ResponseEntity.ok(tasks);
         }

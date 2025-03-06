@@ -11,11 +11,13 @@ import com.example.task.enums.TaskStatus;
 import com.example.task.repository.CommentRepository;
 import com.example.task.repository.TaskRepository;
 import com.example.task.repository.UserRepository;
+import org.apache.coyote.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -118,8 +120,21 @@ public class TaskService {
             Long assigneeId,
             int page,
             int size
-    ) {
-        // Создаем спецификацию для фильтрации
+    ) throws BadRequestException {
+        // Валидация пагинации
+        if (page < 0) {
+            throw new BadRequestException("Page number must not be less than zero");
+        }
+
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Page size must be between 1 and 100");
+        }
+
+        // Проверка критериев фильтрации
+        if (status == null && priority == null && authorId == null && assigneeId == null) {
+            throw new BadRequestException("At least one filter parameter must be provided");
+        }
+
         Specification<Task> spec = Specification.where(null);
 
         if (status != null) {
@@ -135,11 +150,7 @@ public class TaskService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("assignee").get("id"), assigneeId));
         }
 
-        // Создаем объект Pageable для пагинации
-        Pageable pageable = PageRequest.of(page, size);
-
-        // Выполняем запрос с фильтрацией и пагинацией
-        return taskRepository.findAll(spec, pageable);
+        return taskRepository.findAll(spec, PageRequest.of(page, size));
     }
 
     public Comment addComment(Long taskId, String text, User author) {
@@ -161,21 +172,35 @@ public class TaskService {
         // Сохраняем комментарий
         return commentRepository.save(comment);
     }
-    public Task updateTaskStatus(Long taskId, TaskStatus status, User currentUser) {
 
+    public Task updateTaskStatus(Long taskId, TaskStatus status, User currentUser) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
 
-        if (!currentUser.getRoles().contains(Role.ROLE_ADMIN)) {
-            if (task.getAssignee() == null || !task.getAssignee().getId().equals(currentUser.getId())) {
-                throw new RuntimeException("You are not authorized to update the status of this task");
-            }
+        // Для USER проверяем, что он исполнитель
+        if (currentUser.hasUserRole() &&
+                !task.getAssignee().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("No permission to update status");
         }
 
         task.setStatus(status);
-
         return taskRepository.save(task);
     }
+//    public Task updateTaskStatus(Long taskId, TaskStatus status, User currentUser) {
+//
+//        Task task = taskRepository.findById(taskId)
+//                .orElseThrow(() -> new RuntimeException("Task not found"));
+//
+//        if (!currentUser.getRoles().contains(Role.ROLE_ADMIN)) {
+//            if (task.getAssignee() == null || !task.getAssignee().getId().equals(currentUser.getId())) {
+//                throw new RuntimeException("You are not authorized to update the status of this task");
+//            }
+//        }
+//
+//        task.setStatus(status);
+//
+//        return taskRepository.save(task);
+//    }
 }
 
 

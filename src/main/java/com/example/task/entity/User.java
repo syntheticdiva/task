@@ -41,6 +41,13 @@ public class User implements UserDetails {
                 .map(role -> new SimpleGrantedAuthority(role.name()))
                 .collect(Collectors.toList());
     }
+    public boolean hasAdminRole() {
+        return roles.contains(Role.ROLE_ADMIN);
+    }
+
+    public boolean hasUserRole() {
+        return roles.contains(Role.ROLE_USER);
+    }
 
     @Override
     public String getUsername() {
