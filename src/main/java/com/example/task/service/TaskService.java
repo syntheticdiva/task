@@ -2,12 +2,18 @@ package com.example.task.service;
 
 
 
+import com.example.task.dto.CommentDTO;
+import com.example.task.dto.TaskDTO;
 import com.example.task.entity.Comment;
 import com.example.task.entity.Task;
 import com.example.task.entity.User;
 import com.example.task.enums.Role;
 import com.example.task.enums.TaskPriority;
 import com.example.task.enums.TaskStatus;
+import com.example.task.exception.InvalidRequestException;
+import com.example.task.exception.TaskNotFoundException;
+import com.example.task.exception.UnauthorizedActionException;
+import com.example.task.exception.UserNotFoundException;
 import com.example.task.repository.CommentRepository;
 import com.example.task.repository.TaskRepository;
 import com.example.task.repository.UserRepository;
@@ -21,6 +27,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class TaskService {
@@ -32,14 +39,49 @@ public class TaskService {
     @Autowired
     private CommentRepository commentRepository;
 
-    public List<Task> getTasksByAuthor(Long authorId) {
-        return taskRepository.findByAuthorId(authorId);
-    }
+    public List<TaskDTO> getTasksByAuthor(Long authorId) {
+        List<Task> tasks = taskRepository.findByAuthorId(authorId);
 
-    public List<Task> getTasksByAssignee(Long assigneeId) {
-        return taskRepository.findByAssigneeId(assigneeId);
-    }
+        // Преобразуем список сущностей Task в список TaskDTO
+        return tasks.stream()
+                .map(task -> {
+                    TaskDTO taskDTO = new TaskDTO();
+                    taskDTO.setId(task.getId());
+                    taskDTO.setTitle(task.getTitle());
+                    taskDTO.setDescription(task.getDescription());
+                    taskDTO.setStatus(task.getStatus());
+                    taskDTO.setPriority(task.getPriority());
+                    taskDTO.setAuthorId(task.getAuthor().getId());
+                    taskDTO.setAssigneeId(task.getAssignee().getId());
 
+                    // taskDTO.setComments(convertCommentsToDTOs(task.getComments()));
+
+                    return taskDTO;
+                })
+                .collect(Collectors.toList());
+    }
+    public List<TaskDTO> getTasksByAssignee(Long assigneeId) {
+        List<Task> tasks = taskRepository.findByAssigneeId(assigneeId);
+
+        // Преобразуем список сущностей Task в список TaskDTO
+        return tasks.stream()
+                .map(task -> {
+                    TaskDTO taskDTO = new TaskDTO();
+                    taskDTO.setId(task.getId());
+                    taskDTO.setTitle(task.getTitle());
+                    taskDTO.setDescription(task.getDescription());
+                    taskDTO.setStatus(task.getStatus());
+                    taskDTO.setPriority(task.getPriority());
+                    taskDTO.setAuthorId(task.getAuthor().getId());
+                    taskDTO.setAssigneeId(task.getAssignee().getId());
+
+                    // Если нужно передавать комментарии
+                    // taskDTO.setComments(convertCommentsToDTOs(task.getComments()));
+
+                    return taskDTO;
+                })
+                .collect(Collectors.toList());
+    }
 
     public Task createTask(
             String title,
@@ -49,11 +91,9 @@ public class TaskService {
             User author,
             Long assigneeId
     ) {
-        // Находим исполнителя по ID
         User assignee = userRepository.findById(assigneeId)
-                .orElseThrow(() -> new RuntimeException("Assignee not found"));
+                .orElseThrow(() -> new UserNotFoundException("Assignee not found with id: " + assigneeId));
 
-        // Создаем задачу
         Task task = new Task();
         task.setTitle(title);
         task.setDescription(description);
@@ -74,7 +114,7 @@ public class TaskService {
             Long assigneeId
     ) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
 
         if (title != null) {
             task.setTitle(title);
@@ -90,7 +130,7 @@ public class TaskService {
         }
         if (assigneeId != null) {
             User assignee = userRepository.findById(assigneeId)
-                    .orElseThrow(() -> new RuntimeException("Assignee not found"));
+                    .orElseThrow(() -> new UserNotFoundException("Assignee not found with id: " + assigneeId));
             task.setAssignee(assignee);
         }
 
@@ -99,40 +139,53 @@ public class TaskService {
 
     public void deleteTask(Long taskId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
         taskRepository.delete(task);
     }
-    public Task assignTask(Long taskId, Long assigneeId) {
+
+    public TaskDTO assignTask(Long taskId, Long assigneeId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
 
         User assignee = userRepository.findById(assigneeId)
-                .orElseThrow(() -> new RuntimeException("Assignee not found"));
+                .orElseThrow(() -> new UserNotFoundException("Assignee not found with id: " + assigneeId));
 
         task.setAssignee(assignee);
-        return taskRepository.save(task);
-    }
+        Task assignedTask = taskRepository.save(task);
 
-    public Page<Task> getTasks(
+        // Преобразуем сущность Task в TaskDTO
+        TaskDTO taskDTO = new TaskDTO();
+        taskDTO.setId(assignedTask.getId());
+        taskDTO.setTitle(assignedTask.getTitle());
+        taskDTO.setDescription(assignedTask.getDescription());
+        taskDTO.setStatus(assignedTask.getStatus());
+        taskDTO.setPriority(assignedTask.getPriority());
+        taskDTO.setAuthorId(assignedTask.getAuthor().getId());
+        taskDTO.setAssigneeId(assignedTask.getAssignee().getId());
+
+        // Если нужно передавать комментарии
+        // taskDTO.setComments(convertCommentsToDTOs(assignedTask.getComments()));
+
+        return taskDTO;
+    }
+    public Page<TaskDTO> getTasks(
             TaskStatus status,
             TaskPriority priority,
             Long authorId,
             Long assigneeId,
             int page,
             int size
-    ) throws BadRequestException {
-        // Валидация пагинации
+    ) {
         if (page < 0) {
-            throw new BadRequestException("Page number must not be less than zero");
+            throw new InvalidRequestException("Page number must not be less than zero");
         }
 
         if (size < 1 || size > 100) {
-            throw new BadRequestException("Page size must be between 1 and 100");
+            throw new InvalidRequestException("Page size must be between 1 and 100");
         }
 
-        // Проверка критериев фильтрации
         if (status == null && priority == null && authorId == null && assigneeId == null) {
-            throw new BadRequestException("At least one filter parameter must be provided");
+            throw new InvalidRequestException("At least one filter parameter must be provided");
         }
 
         Specification<Task> spec = Specification.where(null);
@@ -150,58 +203,81 @@ public class TaskService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("assignee").get("id"), assigneeId));
         }
 
-        return taskRepository.findAll(spec, PageRequest.of(page, size));
-    }
+        Page<Task> tasks = taskRepository.findAll(spec, PageRequest.of(page, size));
 
-    public Comment addComment(Long taskId, String text, User author) {
-        // Находим задачу по ID
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
-
-        // Проверяем, что пользователь имеет право оставлять комментарий
-        if (!task.getAuthor().getId().equals(author.getId())){
-            throw new RuntimeException("You are not authorized to comment on this task");
+        // Проверяем, есть ли задачи
+        if (tasks.isEmpty()) {
+            throw new TaskNotFoundException("No tasks found with the specified filters");
         }
 
-        // Создаем комментарий
+        // Преобразуем Page<Task> в Page<TaskDTO>
+        return tasks.map(task -> {
+            TaskDTO taskDTO = new TaskDTO();
+            taskDTO.setId(task.getId());
+            taskDTO.setTitle(task.getTitle());
+            taskDTO.setDescription(task.getDescription());
+            taskDTO.setStatus(task.getStatus());
+            taskDTO.setPriority(task.getPriority());
+            taskDTO.setAuthorId(task.getAuthor().getId());
+            taskDTO.setAssigneeId(task.getAssignee().getId());
+
+            // Если нужно передавать комментарии
+            // taskDTO.setComments(convertCommentsToDTOs(task.getComments()));
+
+            return taskDTO;
+        });
+    }
+
+    public CommentDTO addComment(Long taskId, String text, User author) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
+
+        if (!task.getAuthor().getId().equals(author.getId())
+                && !task.getAssignee().getId().equals(author.getId())) {
+            throw new UnauthorizedActionException("You are not authorized to comment on this task");
+        }
+
         Comment comment = new Comment();
         comment.setText(text);
         comment.setTask(task);
         comment.setAuthor(author);
 
-        // Сохраняем комментарий
-        return commentRepository.save(comment);
+        Comment savedComment = commentRepository.save(comment);
+
+        // Преобразуем сущность Comment в CommentDTO
+        CommentDTO commentDTO = new CommentDTO();
+        commentDTO.setId(savedComment.getId());
+        commentDTO.setText(savedComment.getText());
+        commentDTO.setTaskId(savedComment.getTask().getId());
+        commentDTO.setAuthorId(savedComment.getAuthor().getId());
+
+        return commentDTO;
     }
-
-    public Task updateTaskStatus(Long taskId, TaskStatus status, User currentUser) {
+    public TaskDTO updateTaskStatus(Long taskId, TaskStatus status, User currentUser) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
 
-        // Для USER проверяем, что он исполнитель
         if (currentUser.hasUserRole() &&
                 !task.getAssignee().getId().equals(currentUser.getId())) {
             throw new AccessDeniedException("No permission to update status");
         }
 
         task.setStatus(status);
-        return taskRepository.save(task);
+        Task updatedTask = taskRepository.save(task);
+
+        // Преобразуем сущность Task в TaskDTO
+        TaskDTO taskDTO = new TaskDTO();
+        taskDTO.setId(updatedTask.getId());
+        taskDTO.setTitle(updatedTask.getTitle());
+        taskDTO.setDescription(updatedTask.getDescription());
+        taskDTO.setStatus(updatedTask.getStatus());
+        taskDTO.setPriority(updatedTask.getPriority());
+        taskDTO.setAuthorId(updatedTask.getAuthor().getId());
+        taskDTO.setAssigneeId(updatedTask.getAssignee().getId());
+
+        // Если нужно передавать комментарии
+        // taskDTO.setComments(convertCommentsToDTOs(updatedTask.getComments()));
+
+        return taskDTO;
     }
-//    public Task updateTaskStatus(Long taskId, TaskStatus status, User currentUser) {
-//
-//        Task task = taskRepository.findById(taskId)
-//                .orElseThrow(() -> new RuntimeException("Task not found"));
-//
-//        if (!currentUser.getRoles().contains(Role.ROLE_ADMIN)) {
-//            if (task.getAssignee() == null || !task.getAssignee().getId().equals(currentUser.getId())) {
-//                throw new RuntimeException("You are not authorized to update the status of this task");
-//            }
-//        }
-//
-//        task.setStatus(status);
-//
-//        return taskRepository.save(task);
-//    }
 }
-
-
-
