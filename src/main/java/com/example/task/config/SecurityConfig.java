@@ -51,34 +51,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-//        http
-//                .csrf(csrf -> csrf.disable())
-//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-//                .authorizeHttpRequests(auth -> auth
-//                        .requestMatchers(
-//                                "/api/auth/**",
-//                                "/swagger-ui/**",
-//                                "/v3/api-docs/**",
-//                                "/webjars/**",
-//                                "/swagger-resources/**",
-//                                "/swagger-ui.html"
-//                        ).permitAll()
-//
-//                        .requestMatchers("/admin/**").hasRole("ADMIN")
-//
-//                        .requestMatchers("/api/tasks/**").hasAnyRole("ADMIN", "USER")
-//
-//                        .anyRequest().authenticated()
-//                )
-//                .sessionManagement(session ->
-//                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-//                .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
-//
-//        return http.build();
-//    }
-
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
