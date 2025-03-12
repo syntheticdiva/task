@@ -1,0 +1,4 @@
+com\example\task\service\JwtUtilTest.class
+com\example\task\service\TaskServiceTest.class
+com\example\task\service\UserServiceTest.class
+com\example\task\TaskApplicationTests.class
