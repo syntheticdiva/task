@@ -1,5 +1,0 @@
-"db_url"="jdbc:postgresql://localhost:5433/task"
-"db_user"="postgres"
-"db_pass"="111"
-
-"jwt_secret"="mySuperSecretKeyWithAtLeast32Characters123"
