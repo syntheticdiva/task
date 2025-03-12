@@ -18,6 +18,8 @@ import com.example.task.repository.CommentRepository;
 import com.example.task.repository.TaskRepository;
 import com.example.task.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,14 +29,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Validated
 public class TaskService {
     private static final Logger logger = LoggerFactory.getLogger(TaskService.class);
-
 
     @Autowired
     private TaskRepository taskRepository;
@@ -52,28 +55,42 @@ public class TaskService {
         this.commentMapper = commentMapper;
     }
 
-    public List<TaskDTO> getTasksByAuthor(Long authorId) {
+    public List<TaskDTO> getTasksByAuthor(@NotNull @Min(1) Long authorId) {
+        logger.info("Attempting to find tasks for author ID: {}", authorId);
+
+        if (!userRepository.existsById(authorId)) {
+            logger.error("Author with ID {} not found", authorId);
+            throw new UserNotFoundException("Автор с ID " + authorId + " не найден");
+        }
+
         List<Task> tasks = taskRepository.findByAuthorId(authorId);
-        return tasks.stream()
-                .map(taskMapper::toTaskDTO)
-                .collect(Collectors.toList());
-    }
-    public List<TaskDTO> getTasksByAssignee(Long assigneeId) {
-        List<Task> tasks = taskRepository.findByAssigneeId(assigneeId);
+        logger.debug("Found {} tasks for author ID: {}", tasks.size(), authorId);
+
         return tasks.stream()
                 .map(taskMapper::toTaskDTO)
                 .collect(Collectors.toList());
     }
 
+    public List<TaskDTO> getTasksByAssignee(Long assigneeId) {
+        if (!userRepository.existsById(assigneeId)) {
+            throw new UserNotFoundException("Исполнитель с ID " + assigneeId + " не найден");
+        }
+
+        return taskRepository.findByAssigneeId(assigneeId)
+                .stream()
+                .map(taskMapper::toTaskDTO)
+                .collect(Collectors.toList());
+    }
     @Transactional
     public TaskDTO createTask(
-            String title,
-            String description,
+            @NotNull String title,
+            @NotNull String description,
             TaskStatus status,
             TaskPriority priority,
-            User author,
-            Long assigneeId
+            @NotNull User author,
+            @NotNull Long assigneeId
     ) {
+        logger.info("Creating task with title: {}", title);
         User assignee = userRepository.findById(assigneeId)
                 .orElseThrow(() -> new UserNotFoundException("Assignee not found with id: " + assigneeId));
 
@@ -88,14 +105,16 @@ public class TaskService {
         Task savedTask = taskRepository.save(task);
         return taskMapper.toTaskDTO(savedTask);
     }
+
     public TaskDTO updateTask(
-            Long taskId,
+            @NotNull Long taskId,
             String title,
             String description,
             TaskStatus status,
             TaskPriority priority,
             Long assigneeId
     ) {
+        logger.info("Updating task with ID: {}", taskId);
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
 
@@ -121,21 +140,35 @@ public class TaskService {
         return taskMapper.toTaskDTO(updatedTask);
     }
 
-    public void deleteTask(Long taskId) {
+    public void deleteTask(@NotNull Long taskId) {
+        logger.info("Deleting task with ID: {}", taskId);
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
         taskRepository.delete(task);
     }
 
-    public TaskDTO assignTask(Long taskId, Long assigneeId) {
+    public TaskDTO assignTask(
+            @NotNull(message = "Task ID cannot be null") Long taskId,
+            @NotNull(message = "Assignee ID cannot be null") Long assigneeId) {
+
+        logger.info("Assigning task with ID: {} to assignee with ID: {}", taskId, assigneeId);
+
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
+                .orElseThrow(() -> {
+                    logger.error("Task not found with ID: {}", taskId);
+                    return new TaskNotFoundException("Task not found with id: " + taskId);
+                });
 
         User assignee = userRepository.findById(assigneeId)
-                .orElseThrow(() -> new UserNotFoundException("Assignee not found with id: " + assigneeId));
+                .orElseThrow(() -> {
+                    logger.error("Assignee not found with ID: {}", assigneeId);
+                    return new UserNotFoundException("Assignee not found with id: " + assigneeId);
+                });
 
         task.setAssignee(assignee);
         Task assignedTask = taskRepository.save(task);
+
+        logger.info("Task ID: {} successfully assigned to user ID: {}", taskId, assigneeId);
         return taskMapper.toTaskDTO(assignedTask);
     }
     public Page<TaskDTO> getTasks(
@@ -146,13 +179,10 @@ public class TaskService {
             int page,
             int size
     ) {
-        if (page < 0) {
-            throw new InvalidRequestException("Page number must not be less than zero");
-        }
+        logger.info("Fetching tasks with filters: status={}, priority={}, authorId={}, assigneeId={}, page={}, size={}",
+                status, priority, authorId, assigneeId, page, size);
 
-        if (size < 1 || size > 100) {
-            throw new InvalidRequestException("Page size must be between 1 and 100");
-        }
+        validatePageAndSize(page, size);
 
         if (status == null && priority == null && authorId == null && assigneeId == null) {
             throw new InvalidRequestException("At least one filter parameter must be provided");
@@ -179,19 +209,11 @@ public class TaskService {
             throw new TaskNotFoundException("No tasks found with the specified filters");
         }
 
-        return tasks.map(task -> {
-            TaskDTO taskDTO = new TaskDTO();
-            taskDTO.setId(task.getId());
-            taskDTO.setTitle(task.getTitle());
-            taskDTO.setDescription(task.getDescription());
-            taskDTO.setStatus(task.getStatus());
-            taskDTO.setPriority(task.getPriority());
-            taskDTO.setAuthorId(task.getAuthor().getId());
-            taskDTO.setAssigneeId(task.getAssignee().getId());
-            return taskDTO;
-        });
+        return tasks.map(taskMapper::toTaskDTO);
     }
-    public CommentDTO addComment(Long taskId, String text, User author) {
+
+    public CommentDTO addComment(@NotNull Long taskId, @NotNull String text, @NotNull User author) {
+        logger.info("Adding comment to task with ID: {}", taskId);
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
 
@@ -208,8 +230,10 @@ public class TaskService {
         Comment savedComment = commentRepository.save(comment);
         return commentMapper.toCommentDTO(savedComment);
     }
+
     @Transactional
-    public TaskDTO updateTaskPriority(Long taskId, TaskPriority priority) {
+    public TaskDTO updateTaskPriority(@NotNull Long taskId, @NotNull TaskPriority priority) {
+        logger.info("Updating priority of task with ID: {}", taskId);
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
 
@@ -218,7 +242,9 @@ public class TaskService {
 
         return taskMapper.toTaskDTO(updatedTask);
     }
-    public TaskDTO updateTaskStatus(Long taskId, TaskStatus status, User currentUser) {
+
+    public TaskDTO updateTaskStatus(@NotNull Long taskId, @NotNull TaskStatus status, @NotNull User currentUser) {
+        logger.info("Updating status of task with ID: {}", taskId);
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
 
@@ -230,17 +256,20 @@ public class TaskService {
         task.setStatus(status);
         Task updatedTask = taskRepository.save(task);
 
-        TaskDTO taskDTO = new TaskDTO();
-        taskDTO.setId(updatedTask.getId());
-        taskDTO.setTitle(updatedTask.getTitle());
-        taskDTO.setDescription(updatedTask.getDescription());
-        taskDTO.setStatus(updatedTask.getStatus());
-        taskDTO.setPriority(updatedTask.getPriority());
-        taskDTO.setAuthorId(updatedTask.getAuthor().getId());
-        taskDTO.setAssigneeId(updatedTask.getAssignee().getId());
-        return taskDTO;
+        return taskMapper.toTaskDTO(updatedTask);
     }
+
     public Page<TaskDTO> getAllTasks(int page, int size) {
+        logger.info("Fetching all tasks with page={}, size={}", page, size);
+        validatePageAndSize(page, size);
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Task> tasks = taskRepository.findAll(pageable);
+
+        return tasks.map(taskMapper::toTaskDTO);
+    }
+
+    private void validatePageAndSize(int page, int size) {
         if (page < 0) {
             throw new InvalidRequestException("Page number must not be less than zero");
         }
@@ -248,10 +277,5 @@ public class TaskService {
         if (size < 1 || size > 100) {
             throw new InvalidRequestException("Page size must be between 1 and 100");
         }
-
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Task> tasks = taskRepository.findAll(pageable);
-
-        return tasks.map(taskMapper::toTaskDTO);
     }
 }

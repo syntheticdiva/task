@@ -20,5 +20,4 @@ public class CreateTaskRequest {
     @NotNull(message = "Assignee ID is mandatory")
     private Long assigneeId;
 
-
 }
