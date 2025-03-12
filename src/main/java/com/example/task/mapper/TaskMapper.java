@@ -3,8 +3,9 @@ package com.example.task.mapper;
 import com.example.task.dto.TaskDTO;
 import com.example.task.entity.Task;
 import com.example.task.entity.User;
-import org.mapstruct.*;
-import org.mapstruct.factory.Mappers;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
 @Mapper(componentModel = "spring", uses = {CommentMapper.class})
 public abstract class TaskMapper {

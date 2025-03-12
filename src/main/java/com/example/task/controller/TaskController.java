@@ -30,66 +30,71 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/tasks")
+@RequestMapping(TaskController.API_TASKS_PATH)
 @Tag(name = "Task Management", description = "API для управления задачами")
 @SecurityRequirement(name = "Bearer Authentication")
 @RequiredArgsConstructor
 public class TaskController {
+    public static final String API_TASKS_PATH = "/api/tasks";
+    private static final String AUTHOR_PATH = "/author/{authorId}";
+    private static final String ASSIGNEE_PATH = "/assignee/{assigneeId}";
+    private static final String CREATE_PATH = "/create";
+    private static final String TASK_ID_PATH = "/{taskId}";
+    private static final String COMMENTS_PATH = "/comments";
+    private static final String PRIORITY_PATH = "/priority";
+    private static final String STATUS_PATH = "/status";
+    private static final String ASSIGN_PATH = "/assign";
+    private static final String ADMIN_ALL_PATH = "/admin/all";
+
     private static final Logger logger = LoggerFactory.getLogger(TaskController.class);
 
     private final TaskService taskService;
 
     @Operation(
             summary = "Получить задачи по автору",
-            description = "Возвращает список задач, созданных указанным автором.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Задачи успешно найдены",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
+                    @ApiResponse(responseCode = "200", description = "Задачи успешно найдены"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен"),
                     @ApiResponse(responseCode = "404", description = "Автор не найден")
             }
     )
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    @GetMapping("/author/{authorId}")
+    @GetMapping(AUTHOR_PATH)
     public ResponseEntity<List<TaskDTO>> getTasksByAuthor(
-            @Parameter(description = "ID автора задачи", example = "1") @PathVariable Long authorId) {
+            @Parameter(description = "ID автора задачи") @PathVariable Long authorId) {
         List<TaskDTO> tasks = taskService.getTasksByAuthor(authorId);
         return ResponseEntity.ok(tasks);
     }
 
     @Operation(
             summary = "Получить задачи по исполнителю",
-            description = "Возвращает список задач, назначенных указанному исполнителю.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Задачи успешно найдены",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
+                    @ApiResponse(responseCode = "200", description = "Задачи успешно найдены"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен"),
                     @ApiResponse(responseCode = "404", description = "Исполнитель не найден")
             }
     )
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    @GetMapping("/assignee/{assigneeId}")
+    @GetMapping(ASSIGNEE_PATH)
     public ResponseEntity<List<TaskDTO>> getTasksByAssignee(
             @PathVariable Long assigneeId) {
         List<TaskDTO> tasks = taskService.getTasksByAssignee(assigneeId);
         return ResponseEntity.ok(tasks);
     }
+
     @Operation(
             summary = "Создать новую задачу",
-            description = "Создает новую задачу с указанными параметрами.",
             responses = {
-                    @ApiResponse(responseCode = "201", description = "Задача успешно создана",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
+                    @ApiResponse(responseCode = "201", description = "Задача успешно создана"),
                     @ApiResponse(responseCode = "400", description = "Некорректные входные данные"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен")
             }
     )
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/create")
+    @PostMapping(CREATE_PATH)
     public ResponseEntity<TaskDTO> createTask(
             @Valid @RequestBody CreateTaskRequest request,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         User author = (User) authentication.getPrincipal();
         TaskDTO taskDTO = taskService.createTask(
                 request.getTitle(),
@@ -104,19 +109,17 @@ public class TaskController {
 
     @Operation(
             summary = "Обновить задачу",
-            description = "Обновляет данные задачи по её ID.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Задача успешно обновлена",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
+                    @ApiResponse(responseCode = "200", description = "Задача успешно обновлена"),
                     @ApiResponse(responseCode = "400", description = "Некорректные входные данные"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен"),
                     @ApiResponse(responseCode = "404", description = "Задача не найдена")
             }
     )
     @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/{taskId}")
+    @PutMapping(TASK_ID_PATH)
     public ResponseEntity<TaskDTO> updateTask(
-            @Parameter(description = "ID задачи", example = "1") @PathVariable Long taskId,
+            @Parameter(description = "ID задачи") @PathVariable Long taskId,
             @Valid @RequestBody UpdateTaskRequest request) {
         TaskDTO taskDTO = taskService.updateTask(
                 taskId,
@@ -131,19 +134,17 @@ public class TaskController {
 
     @Operation(
             summary = "Добавить комментарий к задаче",
-            description = "Добавляет комментарий к задаче по её ID.",
             responses = {
-                    @ApiResponse(responseCode = "201", description = "Комментарий успешно добавлен",
-                            content = @Content(schema = @Schema(implementation = CommentDTO.class))),
+                    @ApiResponse(responseCode = "201", description = "Комментарий успешно добавлен"),
                     @ApiResponse(responseCode = "400", description = "Некорректные входные данные"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен"),
                     @ApiResponse(responseCode = "404", description = "Задача не найдена")
             }
     )
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    @PostMapping("/{taskId}/comments")
+    @PostMapping(TASK_ID_PATH + COMMENTS_PATH)
     public ResponseEntity<CommentDTO> addComment(
-            @Parameter(description = "ID задачи", example = "1") @PathVariable Long taskId,
+            @Parameter(description = "ID задачи") @PathVariable Long taskId,
             @Valid @RequestBody AddCommentRequest request,
             Authentication authentication) {
         User author = (User) authentication.getPrincipal();
@@ -153,39 +154,34 @@ public class TaskController {
 
     @Operation(
             summary = "Изменить приоритет задачи",
-            description = "Изменяет приоритет задачи по её ID.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Приоритет задачи успешно обновлен",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
+                    @ApiResponse(responseCode = "200", description = "Приоритет задачи успешно обновлен"),
                     @ApiResponse(responseCode = "400", description = "Некорректные входные данные"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен"),
                     @ApiResponse(responseCode = "404", description = "Задача не найдена")
             }
     )
     @PreAuthorize("hasRole('ADMIN')")
-    @PatchMapping("/{taskId}/priority")
+    @PatchMapping(TASK_ID_PATH + PRIORITY_PATH)
     public ResponseEntity<TaskDTO> updateTaskPriority(
-            @Parameter(description = "ID задачи", example = "1") @PathVariable Long taskId,
-            @Valid @RequestBody UpdatePriorityRequest request
-    ) {
+            @Parameter(description = "ID задачи") @PathVariable Long taskId,
+            @Valid @RequestBody UpdatePriorityRequest request) {
         TaskDTO taskDTO = taskService.updateTaskPriority(taskId, request.getPriority());
         return ResponseEntity.ok(taskDTO);
     }
 
     @Operation(
             summary = "Обновить статус задачи",
-            description = "Обновляет статус задачи по её ID.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Статус задачи успешно обновлен",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
+                    @ApiResponse(responseCode = "200", description = "Статус задачи успешно обновлен"),
                     @ApiResponse(responseCode = "400", description = "Некорректные входные данные"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен"),
                     @ApiResponse(responseCode = "404", description = "Задача не найдена")
             }
     )
-    @PutMapping("/{taskId}/status")
+    @PutMapping(TASK_ID_PATH + STATUS_PATH)
     public ResponseEntity<TaskDTO> updateTaskStatus(
-            @Parameter(description = "ID задачи", example = "1") @PathVariable Long taskId,
+            @Parameter(description = "ID задачи") @PathVariable Long taskId,
             @Valid @RequestBody UpdateTaskStatusRequest request,
             Authentication authentication) {
         User currentUser = (User) authentication.getPrincipal();
@@ -195,7 +191,6 @@ public class TaskController {
 
     @Operation(
             summary = "Удалить задачу",
-            description = "Удаляет задачу по её ID.",
             responses = {
                     @ApiResponse(responseCode = "204", description = "Задача успешно удалена"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен"),
@@ -203,86 +198,71 @@ public class TaskController {
             }
     )
     @PreAuthorize("hasRole('ADMIN')")
-    @DeleteMapping("/{taskId}")
+    @DeleteMapping(TASK_ID_PATH)
     public ResponseEntity<Void> deleteTask(
-            @Parameter(description = "ID задачи", example = "1") @PathVariable Long taskId) {
+            @Parameter(description = "ID задачи") @PathVariable Long taskId) {
         taskService.deleteTask(taskId);
         return ResponseEntity.noContent().build();
     }
 
     @Operation(
             summary = "Назначить задачу исполнителю",
-            description = "Назначает задачу указанному исполнителю.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Задача успешно назначена",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
-                    @ApiResponse(responseCode = "400", description = "Некорректные входные данные",
-                            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-                    @ApiResponse(responseCode = "403", description = "Доступ запрещен",
-                            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-                    @ApiResponse(responseCode = "404", description = "Задача или исполнитель не найдены",
-                            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                    @ApiResponse(responseCode = "200", description = "Задача успешно назначена"),
+                    @ApiResponse(responseCode = "400", description = "Некорректные входные данные"),
+                    @ApiResponse(responseCode = "403", description = "Доступ запрещен"),
+                    @ApiResponse(responseCode = "404", description = "Задача или исполнитель не найдены")
             }
     )
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    @PostMapping("/{taskId}/assign/{assigneeId}")
+    @PostMapping(TASK_ID_PATH + ASSIGN_PATH + "/{assigneeId}")
     public ResponseEntity<TaskDTO> assignTask(
-            @Parameter(description = "ID задачи", example = "1")
-            @PathVariable @Min(1) Long taskId,
-
-            @Parameter(description = "ID исполнителя", example = "2")
-            @PathVariable @Min(1) Long assigneeId) {
+            @Parameter(description = "ID задачи") @PathVariable Long taskId,
+            @Parameter(description = "ID исполнителя") @PathVariable Long assigneeId) {
 
         logger.info("Assigning task ID {} to assignee ID {}", taskId, assigneeId);
 
         try {
             TaskDTO taskDTO = taskService.assignTask(taskId, assigneeId);
             return ResponseEntity.ok(taskDTO);
-        } catch (TaskNotFoundException ex) {
-            logger.error("Task assignment failed: {}", ex.getMessage());
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
-        } catch (UserNotFoundException ex) {
-            logger.error("Assignee not found: {}", ex.getMessage());
+        } catch (TaskNotFoundException | UserNotFoundException ex) {
+            logger.error("Assignment error: {}", ex.getMessage());
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
         }
     }
 
     @Operation(
             summary = "Получить задачи с фильтрацией",
-            description = "Возвращает список задач с возможностью фильтрации по статусу, приоритету, автору и исполнителю.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Задачи успешно найдены",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
+                    @ApiResponse(responseCode = "200", description = "Задачи успешно найдены"),
                     @ApiResponse(responseCode = "400", description = "Некорректные параметры фильтрации"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен")
             }
     )
     @GetMapping
     public ResponseEntity<Page<TaskDTO>> getTasks(
-            @Parameter(description = "Статус задачи", example = "IN_PROGRESS") @RequestParam(required = false) TaskStatus status,
-            @Parameter(description = "Приоритет задачи", example = "HIGH") @RequestParam(required = false) TaskPriority priority,
-            @Parameter(description = "ID автора задачи", example = "1") @RequestParam(required = false) Long authorId,
-            @Parameter(description = "ID исполнителя задачи", example = "2") @RequestParam(required = false) Long assigneeId,
-            @Parameter(description = "Номер страницы (начиная с 0)", example = "0") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Размер страницы (1-100)", example = "10") @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(required = false) TaskStatus status,
+            @RequestParam(required = false) TaskPriority priority,
+            @RequestParam(required = false) Long authorId,
+            @RequestParam(required = false) Long assigneeId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         Page<TaskDTO> tasks = taskService.getTasks(status, priority, authorId, assigneeId, page, size);
         return ResponseEntity.ok(tasks);
     }
 
     @Operation(
             summary = "Получить все задачи (только для админов)",
-            description = "Возвращает полный список задач с пагинацией.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Задачи успешно найдены",
-                            content = @Content(schema = @Schema(implementation = TaskDTO.class))),
+                    @ApiResponse(responseCode = "200", description = "Задачи успешно найдены"),
                     @ApiResponse(responseCode = "403", description = "Доступ запрещен")
             }
     )
     @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/admin/all")
+    @GetMapping(ADMIN_ALL_PATH)
     public ResponseEntity<Page<TaskDTO>> getAllTasks(
-            @Parameter(description = "Номер страницы (начиная с 0)", example = "0") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Размер страницы (1-100)", example = "20") @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         Page<TaskDTO> tasks = taskService.getAllTasks(page, size);
         return ResponseEntity.ok(tasks);
     }

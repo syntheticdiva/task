@@ -23,6 +23,9 @@ public class UserService {
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
     private static final int MIN_PASSWORD_LENGTH = 8;
 
+    private static final String DIGIT_REGEX = ".*\\d.*";
+    private static final String LETTER_REGEX = ".*[A-Za-z].*";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -75,11 +78,11 @@ public class UserService {
                     + MIN_PASSWORD_LENGTH + " characters");
         }
 
-        if (!password.matches(".*\\d.*")) {
+        if (!password.matches(DIGIT_REGEX)) {
             throw new InvalidPasswordException("Password must contain at least one digit");
         }
 
-        if (!password.matches(".*[A-Za-z].*")) {
+        if (!password.matches(LETTER_REGEX)) {
             throw new InvalidPasswordException("Password must contain at least one letter");
         }
     }

@@ -4,7 +4,6 @@ import com.example.task.dto.CommentDTO;
 import com.example.task.entity.Comment;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
 
 @Mapper(componentModel = "spring")
 public interface CommentMapper {

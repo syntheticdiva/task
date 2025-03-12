@@ -22,7 +22,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -38,24 +37,23 @@ import java.util.stream.Collectors;
 @Validated
 public class TaskService {
     private static final Logger logger = LoggerFactory.getLogger(TaskService.class);
-
-    @Autowired
-    private TaskRepository taskRepository;
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private CommentRepository commentRepository;
-    @Autowired
+    private static final int MIN_ID_VALUE = 1;
+    private static final int MAX_PAGE_SIZE = 100;
+    private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
+    private final CommentRepository commentRepository;
     private final TaskMapper taskMapper;
-    @Autowired
     private final CommentMapper commentMapper;
 
-    public TaskService(TaskMapper taskMapper, CommentMapper commentMapper) {
+    public TaskService(TaskRepository taskRepository, UserRepository userRepository, CommentRepository commentRepository, TaskMapper taskMapper, CommentMapper commentMapper) {
+        this.taskRepository = taskRepository;
+        this.userRepository = userRepository;
+        this.commentRepository = commentRepository;
         this.taskMapper = taskMapper;
         this.commentMapper = commentMapper;
     }
 
-    public List<TaskDTO> getTasksByAuthor(@NotNull @Min(1) Long authorId) {
+    public List<TaskDTO> getTasksByAuthor(@NotNull @Min(MIN_ID_VALUE) Long authorId) {
         logger.info("Attempting to find tasks for author ID: {}", authorId);
 
         if (!userRepository.existsById(authorId)) {
@@ -274,7 +272,7 @@ public class TaskService {
             throw new InvalidRequestException("Page number must not be less than zero");
         }
 
-        if (size < 1 || size > 100) {
+        if (size < 1 || size > MAX_PAGE_SIZE) {
             throw new InvalidRequestException("Page size must be between 1 and 100");
         }
     }
